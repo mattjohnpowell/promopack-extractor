@@ -12,7 +12,7 @@ from cachetools import TTLCache
 from fastapi import (BackgroundTasks, Depends, FastAPI, HTTPException, Request,
                      Response)
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Histogram,
                                generate_latest)
@@ -874,6 +874,150 @@ async def get_job_status(
     )
 
     return job
+
+
+@app.get("/", response_class=HTMLResponse, tags=["Homepage"])
+async def homepage():
+    """Homepage for PromoPack Extractor service."""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>PromoPack Extractor - AI-Powered PDF Processing</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: #333;
+                min-height: 100vh;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .hero {
+                text-align: center;
+                padding: 100px 20px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                margin-bottom: 50px;
+                backdrop-filter: blur(10px);
+            }
+            .hero h1 {
+                font-size: 3em;
+                margin-bottom: 20px;
+                color: white;
+            }
+            .hero p {
+                font-size: 1.5em;
+                margin-bottom: 30px;
+                color: #f0f0f0;
+            }
+            .features {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 30px;
+                margin-bottom: 50px;
+            }
+            .feature {
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                text-align: center;
+            }
+            .feature h3 {
+                color: #667eea;
+                margin-bottom: 15px;
+            }
+            .cta {
+                text-align: center;
+                padding: 50px 20px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 10px;
+                backdrop-filter: blur(10px);
+            }
+            .cta h2 {
+                color: white;
+                margin-bottom: 20px;
+            }
+            .cta p {
+                color: #f0f0f0;
+                margin-bottom: 30px;
+            }
+            .btn {
+                display: inline-block;
+                padding: 15px 30px;
+                background: #667eea;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                font-weight: bold;
+                transition: background 0.3s;
+            }
+            .btn:hover {
+                background: #5a6fd8;
+            }
+            footer {
+                text-align: center;
+                padding: 20px;
+                color: #f0f0f0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <section class="hero">
+                <h1>Welcome to PromoPack Extractor</h1>
+                <p>Revolutionize your promotional material processing with AI-powered PDF analysis</p>
+            </section>
+            
+            <section class="features">
+                <div class="feature">
+                    <h3>🚀 Fast Processing</h3>
+                    <p>Extract key claims from PDF documents in seconds using advanced language models.</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 High Accuracy</h3>
+                    <p>Leverage Google Gemini AI for precise identification and extraction of promotional claims.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔧 API Integration</h3>
+                    <p>Seamlessly integrate with your existing workflows via our REST API.</p>
+                </div>
+                <div class="feature">
+                    <h3>📊 Cost Tracking</h3>
+                    <p>Monitor usage and costs with built-in analytics and reporting.</p>
+                </div>
+                <div class="feature">
+                    <h3>🔒 Secure & Reliable</h3>
+                    <p>Enterprise-grade security with rate limiting, authentication, and monitoring.</p>
+                </div>
+                <div class="feature">
+                    <h3>📈 Scalable</h3>
+                    <p>Handle large volumes of documents with our robust async processing system.</p>
+                </div>
+            </section>
+            
+            <section class="cta">
+                <h2>Ready to Get Started?</h2>
+                <p>Join pharmaceutical companies worldwide in streamlining their promotional material workflows.</p>
+                <a href="/docs" class="btn">View API Documentation</a>
+            </section>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 PromoPack Extractor. Built for the pharmaceutical industry.</p>
+        </footer>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 
 @app.get("/health", tags=["Health & Monitoring"])
