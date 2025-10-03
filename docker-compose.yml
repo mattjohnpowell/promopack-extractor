@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  promopack-extractor:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY_SECRET=${API_KEY_SECRET}
+      - LANGEXTRACT_API_KEY=${LANGEXTRACT_API_KEY}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./prod.db}
+      - ENV=prod
+      - LOG_TO_FILE=false
+      - LOG_LEVEL=INFO
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-10}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-20971520}
+      - MAX_PAGES=${MAX_PAGES:-1000}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30.0}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - promopack-network
+
+networks:
+  promopack-network:
+    driver: bridge
+
+volumes:
+  data:
+  logs:
