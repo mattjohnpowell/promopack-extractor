@@ -6,7 +6,7 @@ langextract==1.0.9
 python-multipart==0.0.6
 langdetect==1.0.9
 cachetools==5.3.2
-tenacity==8.2.3
+tenacity==9.1.2
 pytesseract==0.3.10
 pillow==10.1.0
 prometheus-client==0.19.0
