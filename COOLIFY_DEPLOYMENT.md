@@ -60,6 +60,7 @@ git push -u origin master
 
 5. **Deploy**
    - Click "Deploy"
+   - 
    - Coolify will build your Docker image and deploy it
    - Monitor the build logs for any issues
 
