@@ -281,109 +281,27 @@ class PromptTemplate:
                     """\
                     Extract pharmaceutical claims from this document.
 
-                    A claim is a statement about what the drug does, how it's used, or its safety profile.
-
-                    EXTRACT complete statements about:
-                    - Treatment effectiveness and outcomes (e.g., "reduced risk by 21%")
-                    - Safety and adverse reactions (e.g., "well-tolerated in elderly patients")
-                    - Indications and contraindications (e.g., "indicated for treatment of DVT")
-                    - Dosing and administration (e.g., "recommended dose is 20 mg once daily")
-                    - Pharmacokinetics (e.g., "peak concentration occurs within 2 hours")
-
-                    SKIP incomplete fragments, table headers, questions, and background disease information.
-
-                    Extract the EXACT text without paraphrasing. Include numbers and statistics."""
+                    Extract statements about drug effectiveness, safety, indications, dosing, or pharmacokinetics.
+                    Use exact text. Include statistics."""
                 ),
                 "examples": [
-                    # POSITIVE EXAMPLES - Valid Claims
                     lx.data.ExampleData(
-                        text="XARELTO reduced the risk of stroke and systemic embolism by 21% compared to warfarin (HR 0.79, 95% CI 0.70-0.89, p<0.001).",
+                        text="Drug X reduced stroke risk by 21% compared to placebo.",
                         extractions=[
                             lx.data.Extraction(
                                 extraction_class="claim",
-                                extraction_text="XARELTO reduced the risk of stroke and systemic embolism by 21% compared to warfarin (HR 0.79, 95% CI 0.70-0.89, p<0.001)",
-                                attributes={
-                                    "confidence": 0.99,
-                                    "claim_type": "EFFICACY",
-                                    "is_comparative": True,
-                                    "has_statistics": True,
-                                },
+                                extraction_text="Drug X reduced stroke risk by 21% compared to placebo",
+                                attributes={"confidence": 0.95},
                             )
                         ],
                     ),
                     lx.data.ExampleData(
-                        text="The most common adverse reaction was bleeding, occurring in 14.9% of XARELTO-treated patients.",
+                        text="The most common adverse reaction was nausea in 15% of patients.",
                         extractions=[
                             lx.data.Extraction(
                                 extraction_class="claim",
-                                extraction_text="The most common adverse reaction was bleeding, occurring in 14.9% of XARELTO-treated patients",
-                                attributes={
-                                    "confidence": 0.96,
-                                    "claim_type": "SAFETY",
-                                    "is_comparative": False,
-                                    "has_statistics": True,
-                                },
-                            )
-                        ],
-                    ),
-                    lx.data.ExampleData(
-                        text="XARELTO is indicated for the treatment of deep vein thrombosis (DVT) and pulmonary embolism (PE).",
-                        extractions=[
-                            lx.data.Extraction(
-                                extraction_class="claim",
-                                extraction_text="XARELTO is indicated for the treatment of deep vein thrombosis (DVT) and pulmonary embolism (PE)",
-                                attributes={
-                                    "confidence": 0.98,
-                                    "claim_type": "INDICATION",
-                                    "is_comparative": False,
-                                    "has_statistics": False,
-                                },
-                            )
-                        ],
-                    ),
-                    lx.data.ExampleData(
-                        text="Well-tolerated in patients 75 years and older with no dose adjustment required.",
-                        extractions=[
-                            lx.data.Extraction(
-                                extraction_class="claim",
-                                extraction_text="Well-tolerated in patients 75 years and older with no dose adjustment required",
-                                attributes={
-                                    "confidence": 0.94,
-                                    "claim_type": "SAFETY",
-                                    "is_comparative": False,
-                                    "has_statistics": False,
-                                },
-                            )
-                        ],
-                    ),
-                    lx.data.ExampleData(
-                        text="Contraindicated in patients with active pathological bleeding.",
-                        extractions=[
-                            lx.data.Extraction(
-                                extraction_class="claim",
-                                extraction_text="Contraindicated in patients with active pathological bleeding",
-                                attributes={
-                                    "confidence": 0.96,
-                                    "claim_type": "CONTRAINDICATION",
-                                    "is_comparative": False,
-                                    "has_statistics": False,
-                                },
-                            )
-                        ],
-                    ),
-                    # MIXED EXAMPLE - Extract only valid claims from text with background info
-                    lx.data.ExampleData(
-                        text="In the ROCKET AF trial, patients receiving XARELTO showed a 45% reduction in major bleeding events compared to warfarin. Atrial fibrillation affects millions of people.",
-                        extractions=[
-                            lx.data.Extraction(
-                                extraction_class="claim",
-                                extraction_text="patients receiving XARELTO showed a 45% reduction in major bleeding events compared to warfarin",
-                                attributes={
-                                    "confidence": 0.97,
-                                    "claim_type": "SAFETY",
-                                    "is_comparative": True,
-                                    "has_statistics": True,
-                                },
+                                extraction_text="The most common adverse reaction was nausea in 15% of patients",
+                                attributes={"confidence": 0.92},
                             )
                         ],
                     ),
