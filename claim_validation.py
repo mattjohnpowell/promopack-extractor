@@ -195,9 +195,9 @@ class ClaimValidator:
             warnings.append(ValidationWarning.MISSING_VERB)
             confidence_penalty -= 0.3
 
-        # Check word count
+        # Check word count - pharmaceutical claims need sufficient detail
         word_count = len(text.split())
-        if word_count < 5:
+        if word_count < 4:  # More lenient - 4 words minimum instead of 5
             warnings.append(ValidationWarning.LOW_WORD_COUNT)
             confidence_penalty -= 0.2
 
@@ -251,8 +251,8 @@ class ClaimValidator:
             warnings.append(ValidationWarning.CONTEXT_DEPENDENT)
             confidence_penalty -= 0.4
 
-        # Determine validity - must pass all three tests
-        is_valid = is_complete and is_about_drug and requires_evidence and word_count >= 5
+        # Determine validity - must pass all three tests (relaxed word count to 4)
+        is_valid = is_complete and is_about_drug and requires_evidence and word_count >= 4
 
         # Generate reasoning
         reasoning = self._generate_reasoning(
@@ -287,22 +287,29 @@ class ClaimValidator:
         # Use pattern-based heuristics (no spacy needed)
         has_verb = bool(
             re.search(
-                r"\b(is|are|was|were|reduce[ds]?|improve[ds]?|prevent[ds]?|cause[ds]?|show[ns]?|demonstrate[ds]?|achieve[ds]?|indicate[ds]?|recommend[s]?|may|should|will|can)\b",
+                r"\b(is|are|was|were|reduce[ds]?|improve[ds]?|prevent[ds]?|cause[ds]?|show[ns]?|demonstrate[ds]?|achieve[ds]?|indicate[ds]?|recommend[s]?|contraindicate[ds]?|tolerate[ds]?|occur[rs]?|report[s]?ed|observe[ds]?|may|should|will|can|had|have|has)\b",
                 text,
                 re.IGNORECASE,
             )
         )
-        
-        # Check for subject (likely starts with drug name, patients, study, etc.)
+
+        # Check for subject - more flexible patterns
+        # Look for noun-like subjects anywhere in reasonable position (first 30% of text)
+        first_portion = text[:max(50, len(text) // 3)]
         has_subject = bool(
             re.search(
-                r"^[A-Z][a-zA-Z]+\s+(is|are|was|were|reduce|improve|prevent|demonstrate|show)|^\w+\s+(patients?|subjects?|treatment|therapy|drug)",
-                text
+                r"\b([A-Z][a-zA-Z]{2,}|patients?|subjects?|treatment|therapy|drug|dose|study|trial|adverse|events?|bleeding|efficacy|safety|indication|contraindication|risk)\b",
+                first_portion,
+                re.IGNORECASE
             )
-        ) or len(text.split()) >= 5
-        
-        # Check completeness
-        is_complete = text.strip().endswith((".", ")", "%")) and len(text.split()) >= 5
+        ) or len(text.split()) >= 6
+
+        # Check completeness - more lenient for pharmaceutical claims
+        # Claims don't always end with period if extracted from middle of text
+        # Just check for reasonable length and that it doesn't end mid-word
+        word_count = len(text.split())
+        ends_reasonably = not text.strip().endswith((',', 'and', 'or', 'but', 'with', 'in', 'of', 'to'))
+        is_complete = word_count >= 5 and ends_reasonably
 
         return has_subject, has_verb, is_complete
 
@@ -390,23 +397,27 @@ class ClaimValidator:
 
     def _is_likely_fragment(self, text: str) -> bool:
         """Check if text appears to be a sentence fragment."""
-        # Starts with lowercase (except "p<" for p-values)
-        if text and text[0].islower() and not text.startswith("p"):
+        # Only flag obvious fragments, not borderline cases
+
+        # Starts with lowercase (except "p<" for p-values or valid words that start lowercase)
+        if text and text[0].islower() and not text.startswith(("p<", "p=", "p >", "rivaroxaban", "warfarin")):
+            # Only flag as fragment if ALSO very short
+            if len(text.split()) < 4:
+                return True
+
+        # Ends with obvious continuation markers
+        if re.search(r"(and|or|but)\s*$", text.strip()):
             return True
 
-        # Ends with conjunctions or commas
-        if re.search(r"(and|or|but|with|,|;)\s*$", text.strip()):
+        # Contains percentage without any context at all - very short
+        if re.search(r"^\d+(\.\d+)?%\s*$", text.strip()):
             return True
 
-        # Contains percentage without subject
-        if re.search(r"^\d+(\.\d+)?%\s+", text):
-            return True
-
-        # Very short without clear subject
-        if len(text.split()) < 6 and not re.search(
-            r"\b(is|are|was|were|indicated|contraindicated)\b", text, re.IGNORECASE
-        ):
-            return True
+        # Very short (< 4 words) without clear subject AND verb
+        if len(text.split()) < 4:
+            has_verb = bool(re.search(r"\b(is|are|was|were|reduce[ds]?|improve[ds]?|show[ns]?|indicate[ds]?|contraindicate[ds]?)\b", text, re.IGNORECASE))
+            if not has_verb:
+                return True
 
         return False
 
