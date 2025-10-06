@@ -21,37 +21,10 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY --chown=app:app requirements.txt ./
 
-# Install Python dependencies with increased timeout and retries
-# Split into multiple steps to avoid timeouts
-RUN pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    fastapi==0.104.1 \
-    uvicorn[standard]==0.24.0 \
-    python-dotenv==1.0.0 \
-    pydantic \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    sqlalchemy[asyncio]==2.0.23 \
-    aiosqlite==0.19.0 \
-    alembic==1.12.1 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    httpx==0.25.2 \
-    langextract==1.0.9 \
-    python-multipart==0.0.6 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    pymupdf>=1.24.0 \
-    pytesseract==0.3.10 \
-    pillow==10.1.0 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    langdetect==1.0.9 \
-    cachetools==5.3.2 \
-    tenacity==8.2.3 \
-    prometheus-client==0.19.0 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    spacy==3.7.2
-
-# Download spaCy language model for claim validation
-# Using pip install instead of spacy download for Docker compatibility
-RUN pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+# Install Python dependencies
+# NOTE: Reverting to working version (commit 65c6246) without spacy
+# spacy was causing build timeouts and is not needed for production deployment
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application code
 COPY --chown=app:app . .
