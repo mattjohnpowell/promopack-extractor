@@ -1,4 +1,13 @@
+# Alternative Dockerfile with better error handling and optimization
+# Use this if the main Dockerfile continues to fail
+
 FROM python:3.12-slim
+
+# Set pip configuration for better reliability
+ENV PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=5 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1
 
 # Install system dependencies for PDF processing and OCR
 RUN apt-get update && apt-get install -y \
@@ -18,39 +27,52 @@ RUN useradd --create-home --shell /bin/bash app \
 USER app
 WORKDIR /app
 
+# Upgrade pip first
+RUN pip install --user --upgrade pip setuptools wheel
+
 # Copy requirements first for better caching
 COPY --chown=app:app requirements.txt ./
 
-# Install Python dependencies with increased timeout and retries
-# Split into multiple steps to avoid timeouts
-RUN pip install --no-cache-dir --user --timeout=300 --retries=5 \
+# Install dependencies in groups to avoid timeouts
+# Core FastAPI and async dependencies
+RUN pip install --user \
     fastapi==0.104.1 \
     uvicorn[standard]==0.24.0 \
-    python-dotenv==1.0.0 \
-    pydantic \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
+    python-dotenv==1.0.0
+
+# Database dependencies
+RUN pip install --user \
     sqlalchemy[asyncio]==2.0.23 \
     aiosqlite==0.19.0 \
-    alembic==1.12.1 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
+    alembic==1.12.1
+
+# HTTP and API dependencies
+RUN pip install --user \
     httpx==0.25.2 \
+    python-multipart==0.0.6
+
+# LLM and language processing
+RUN pip install --user \
     langextract==1.0.9 \
-    python-multipart==0.0.6 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
+    langdetect==1.0.9
+
+# PDF processing (potentially large)
+RUN pip install --user \
     pymupdf>=1.24.0 \
     pytesseract==0.3.10 \
-    pillow==10.1.0 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    langdetect==1.0.9 \
+    pillow==10.1.0
+
+# Utility dependencies
+RUN pip install --user \
     cachetools==5.3.2 \
     tenacity==8.2.3 \
-    prometheus-client==0.19.0 \
-    && pip install --no-cache-dir --user --timeout=300 --retries=5 \
-    spacy==3.7.2
+    prometheus-client==0.19.0
 
-# Download spaCy language model for claim validation
-# Using pip install instead of spacy download for Docker compatibility
-RUN pip install --no-cache-dir --user --timeout=300 --retries=5 \
+# spaCy (large, install separately)
+RUN pip install --user spacy==3.7.2
+
+# Download spaCy language model
+RUN pip install --user \
     https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 # Copy application code
