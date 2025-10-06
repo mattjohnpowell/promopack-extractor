@@ -1,7 +1,7 @@
 # Alternative Dockerfile with better error handling and optimization
 # Use this if the main Dockerfile continues to fail
 
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Set pip configuration for better reliability
 ENV PIP_DEFAULT_TIMEOUT=300 \

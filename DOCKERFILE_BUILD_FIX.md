@@ -213,11 +213,11 @@ Consider a multi-stage build that pre-installs dependencies:
 
 ```dockerfile
 # Stage 1: Build dependencies
-FROM python:3.12-slim as builder
+FROM python:3.13-slim as builder
 # Install all dependencies here
 
 # Stage 2: Runtime
-FROM python:3.12-slim
+FROM python:3.13-slim
 COPY --from=builder /app/.local /app/.local
 # Copy only what's needed
 ```
