@@ -13,8 +13,8 @@ from logging_config import logger
 class ModelType(Enum):
     """Available LLM models with their characteristics."""
 
-    GEMINI_FLASH = "gemini-1.5-flash"  # Fast, cost-effective
-    GEMINI_PRO = "gemini-1.5-pro"  # More accurate, slower, expensive
+    GEMINI_FLASH = "gemini-2.5-flash"  # Latest, fast, cost-effective
+    GEMINI_PRO = "gemini-2.5-pro"  # More accurate, slower, expensive
 
 
 class PromptVersion(Enum):
@@ -279,45 +279,20 @@ class PromptTemplate:
             PromptVersion.V4_REGULATORY: {
                 "prompt": textwrap.dedent(
                     """\
-                    Extract ONLY pharmaceutical regulatory claims from this document.
+                    Extract pharmaceutical claims from this document.
 
-                    CRITICAL: A regulatory claim must pass ALL three tests:
-                    
-                    1. Is it a COMPLETE statement?
-                       - Has subject + verb + object
-                       - Can stand alone and be understood without surrounding context
-                       - NOT a fragment, NOT a partial sentence
-                    
-                    2. Does it make an ASSERTION about the DRUG?
-                       - States what the drug DOES, IS, or CAUSES
-                       - NOT about the disease background
-                       - NOT about study methodology
-                    
-                    3. Would a regulator ask "WHERE'S THE PROOF?"
-                       - Requires clinical evidence to substantiate
-                       - Is actionable medical information
-                       - NOT trivial facts (e.g., "is a tablet")
+                    A claim is a statement about what the drug does, how it's used, or its safety profile.
 
-                    EXTRACT THESE (Valid Claims):
-                    ✅ "[DRUG] reduced [outcome] by X% compared to [comparator]"
-                    ✅ "Well-tolerated in [population]"
-                    ✅ "Indicated for treatment of [condition]"
-                    ✅ "Peak plasma concentration occurs within X hours"
-                    ✅ "The most common adverse reaction was [event]"
-                    ✅ "Contraindicated in patients with [condition]"
-                    ✅ "The recommended dose is X mg [frequency]"
+                    EXTRACT complete statements about:
+                    - Treatment effectiveness and outcomes (e.g., "reduced risk by 21%")
+                    - Safety and adverse reactions (e.g., "well-tolerated in elderly patients")
+                    - Indications and contraindications (e.g., "indicated for treatment of DVT")
+                    - Dosing and administration (e.g., "recommended dose is 20 mg once daily")
+                    - Pharmacokinetics (e.g., "peak concentration occurs within 2 hours")
 
-                    DO NOT EXTRACT (Invalid - Skip These):
-                    ❌ Sentence fragments: "increase in AUCinf and a 56%"
-                    ❌ Background info: "Atrial fibrillation affects 2.7 million Americans"
-                    ❌ Study methodology: "Patients were randomized 1:1 to treatment groups"
-                    ❌ Table headers: "Adverse Event | Drug | Placebo"
-                    ❌ Section titles: "Clinical Pharmacology"
-                    ❌ Questions: "What is [DRUG]?"
-                    ❌ Citations: "(Smith et al. NEJM 2011)"
-                    ❌ Boilerplate: "See full prescribing information"
+                    SKIP incomplete fragments, table headers, questions, and background disease information.
 
-                    Extract the EXACT text of the claim. Do NOT paraphrase. Include statistical data when present."""
+                    Extract the EXACT text without paraphrasing. Include numbers and statistics."""
                 ),
                 "examples": [
                     # POSITIVE EXAMPLES - Valid Claims
@@ -381,32 +356,22 @@ class PromptTemplate:
                             )
                         ],
                     ),
-                    # NEGATIVE EXAMPLES - Should NOT Extract
                     lx.data.ExampleData(
-                        text="increase in AUCinf and a 56%",
-                        extractions=[],  # No extraction - incomplete fragment
+                        text="Contraindicated in patients with active pathological bleeding.",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="Contraindicated in patients with active pathological bleeding",
+                                attributes={
+                                    "confidence": 0.96,
+                                    "claim_type": "CONTRAINDICATION",
+                                    "is_comparative": False,
+                                    "has_statistics": False,
+                                },
+                            )
+                        ],
                     ),
-                    lx.data.ExampleData(
-                        text="Atrial fibrillation is a common cardiac arrhythmia affecting millions worldwide.",
-                        extractions=[],  # No extraction - background info about disease
-                    ),
-                    lx.data.ExampleData(
-                        text="In the ROCKET AF trial, 14,264 patients with atrial fibrillation were randomized to receive either XARELTO or warfarin.",
-                        extractions=[],  # No extraction - study methodology
-                    ),
-                    lx.data.ExampleData(
-                        text="Table 3: Adverse Events by Treatment Group",
-                        extractions=[],  # No extraction - table header
-                    ),
-                    lx.data.ExampleData(
-                        text="What is XARELTO?",
-                        extractions=[],  # No extraction - question
-                    ),
-                    lx.data.ExampleData(
-                        text="See full prescribing information for complete safety information.",
-                        extractions=[],  # No extraction - boilerplate
-                    ),
-                    # MIXED EXAMPLES - Extract only valid claims
+                    # MIXED EXAMPLE - Extract only valid claims from text with background info
                     lx.data.ExampleData(
                         text="In the ROCKET AF trial, patients receiving XARELTO showed a 45% reduction in major bleeding events compared to warfarin. Atrial fibrillation affects millions of people.",
                         extractions=[
@@ -420,7 +385,7 @@ class PromptTemplate:
                                     "has_statistics": True,
                                 },
                             )
-                        ],  # Extract only the claim about drug performance, not the background info
+                        ],
                     ),
                 ],
             },

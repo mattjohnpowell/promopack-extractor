@@ -175,7 +175,7 @@ class ExtractClaimsRequest(BaseModel):
     prompt_version: Optional[str] = (
         None  # "v1_basic", "v2_enhanced", "v3_context_aware", "v4_regulatory"
     )
-    force_model: Optional[str] = None  # "gemini-1.5-flash", "gemini-1.5-pro"
+    force_model: Optional[str] = None  # "gemini-2.5-flash", "gemini-2.5-pro"
 
 
 class ClaimContext(BaseModel):
@@ -241,9 +241,9 @@ class JobStatus(BaseModel):
 class AsyncExtractClaimsRequest(BaseModel):
     document_url: HttpUrl
     prompt_version: Optional[str] = (
-        None  # "v1_basic", "v2_enhanced", "v3_context_aware"
+        None  # "v1_basic", "v2_enhanced", "v3_context_aware", "v4_regulatory"
     )
-    force_model: Optional[str] = None  # "gemini-1.5-flash", "gemini-1.5-pro"
+    force_model: Optional[str] = None  # "gemini-2.5-flash", "gemini-2.5-pro"
 
 
 class ErrorResponse(BaseModel):

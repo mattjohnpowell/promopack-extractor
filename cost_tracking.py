@@ -35,15 +35,15 @@ class CostMetrics:
 class CostTracker:
     """Tracks costs and usage for LLM calls."""
 
-    # Cost per 1K tokens (as of 2024, approximate)
+    # Cost per 1K tokens (as of 2025, approximate)
     MODEL_COSTS = {
-        "gemini-1.5-flash": {
-            "input": 0.000075,  # $0.075 per 1M tokens
-            "output": 0.0003,  # $0.30 per 1M tokens
+        "gemini-2.5-flash": {
+            "input": 0.0,  # Free during preview
+            "output": 0.0,  # Free during preview
         },
-        "gemini-1.5-pro": {
-            "input": 0.00125,  # $1.25 per 1M tokens
-            "output": 0.005,  # $5.00 per 1M tokens
+        "gemini-2.5-pro": {
+            "input": 0.00125,  # $1.25 per 1M tokens (estimated)
+            "output": 0.005,  # $5.00 per 1M tokens (estimated)
         },
     }
 
