@@ -13,8 +13,8 @@ from logging_config import logger
 class ModelType(Enum):
     """Available LLM models with their characteristics."""
 
-    GEMINI_FLASH = "gemini-2.5-flash"  # Latest, fast, cost-effective
-    GEMINI_PRO = "gemini-2.5-pro"  # More accurate, slower, expensive
+    GEMINI_FLASH = "gemini-2.5-flash"  # Latest, fast, cost-effective (recommended)
+    GEMINI_PRO = "gemini-2.5-pro"  # More accurate, deeper reasoning
 
 
 class PromptVersion(Enum):
@@ -456,15 +456,12 @@ class ModelSelector:
 
         analysis = self.analyze_complexity(text)
 
-        # Model selection logic
-        if analysis["length"] < self.complexity_thresholds["short"]:
-            return ModelType.GEMINI_FLASH  # Fast for simple content
-        elif analysis["complexity_score"] > 3.0:
-            return ModelType.GEMINI_PRO  # Complex content needs better model
-        elif analysis["has_stats"] and analysis["has_references"]:
-            return ModelType.GEMINI_PRO  # Statistical/regulatory content
+        # Model selection logic - default to FLASH (recommended by LangExtract)
+        # PRO only for extremely complex content or when explicitly requested
+        if analysis["complexity_score"] > 5.0:  # Very high complexity threshold
+            return ModelType.GEMINI_PRO  # Only for extremely complex content
         else:
-            return ModelType.GEMINI_FLASH  # Default to faster model
+            return ModelType.GEMINI_FLASH  # Default to faster, recommended model
 
 
 class PromptManager:
