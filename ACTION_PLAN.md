@@ -59,7 +59,8 @@ echo $ENV
 **Expected output:**
 ```
 test-api-key
-AIzaSyAc1rCvcoVjE2S8H95ThGKWjSkyb9xqrro
+
+
 prod
 ```
 

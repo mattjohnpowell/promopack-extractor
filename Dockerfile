@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+# Force cache invalidation (change this value to force rebuild)
+ARG CACHEBUST=1
+
 # Install system dependencies for PDF processing and OCR
 RUN apt-get update && apt-get install -y \
     build-essential \

@@ -441,6 +441,20 @@ async def process_pdf_extraction(
                     scan_and_filter_content(full_text, request_id)
                 )
 
+                # Validate processed text is not empty
+                if not processed_text or not processed_text.strip():
+                    logger.error(
+                        "Processed text is empty after security filtering",
+                        extra={
+                            "request_id": request_id,
+                            "original_text_length": len(full_text),
+                        },
+                    )
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Document contains no extractable text after security filtering",
+                    )
+
                 # Parse prompt engineering parameters
                 pv = None
                 fm = None
@@ -746,6 +760,20 @@ async def extract_claims(
         processed_text, security_result, compliance_result = scan_and_filter_content(
             full_text, request_id
         )
+
+        # Validate processed text is not empty
+        if not processed_text or not processed_text.strip():
+            logger.error(
+                "Processed text is empty after security filtering",
+                extra={
+                    "request_id": request_id,
+                    "original_text_length": len(full_text),
+                },
+            )
+            raise HTTPException(
+                status_code=422,
+                detail="Document contains no extractable text after security filtering",
+            )
 
         # Log security scan results
         if security_result.has_sensitive_content:

@@ -7,8 +7,8 @@ from typing import Any, List, Optional, Tuple
 
 import langextract as lx
 from langdetect import LangDetectException, detect
-from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
-                      wait_exponential)
+from tenacity import (retry, retry_if_exception_type, retry_if_not_exception_type,
+                      stop_after_attempt, wait_exponential)
 
 from cost_tracking import cost_tracker
 from logging_config import logger
@@ -235,19 +235,68 @@ def extract_claims_with_fallback(
                 extra={"request_id": request_id},
             )
 
+            # Validate text is not empty before attempting extraction
+            if not text or not text.strip():
+                logger.error(
+                    "Empty text provided for extraction",
+                    extra={"request_id": request_id},
+                )
+                raise ValueError("Cannot extract claims from empty text")
+
             # Use circuit breaker and retry logic
+            # Don't retry on ValueError (empty responses) - fail fast and try next model
             @retry(
                 stop=stop_after_attempt(3),
                 wait=wait_exponential(multiplier=1, min=4, max=10),
-                retry=retry_if_exception_type(Exception),
+                retry=retry_if_not_exception_type(ValueError),
             )
             def _extract_with_retry():
-                return lx.extract(
-                    text_or_documents=text,
-                    prompt_description=prompt,
-                    examples=examples,
-                    model_id=model_id,
-                )
+                try:
+                    result = lx.extract(
+                        text_or_documents=text,
+                        prompt_description=prompt,
+                        examples=examples,
+                        model_id=model_id,
+                    )
+                    
+                    # Log successful result for debugging
+                    logger.debug(
+                        f"LLM extraction result from {model_id}",
+                        extra={
+                            "request_id": request_id,
+                            "has_extractions": hasattr(result, "extractions"),
+                            "extraction_count": len(result.extractions) if hasattr(result, "extractions") else 0,
+                        },
+                    )
+                    
+                    return result
+                    
+                except ValueError as ve:
+                    # langextract raises ValueError for empty tokens or alignment issues
+                    error_msg = str(ve).lower()
+                    if "empty" in error_msg or "token" in error_msg:
+                        logger.warning(
+                            f"LLM returned empty or malformed response for model {model_id}",
+                            extra={
+                                "request_id": request_id,
+                                "error": str(ve),
+                                "text_length": len(text),
+                                "text_preview": text[:200] if text else "",
+                            },
+                        )
+                        # Don't retry for empty responses - fail fast and try next model
+                        raise ValueError(f"Empty LLM response from {model_id}") from ve
+                    raise
+                except Exception as e:
+                    logger.error(
+                        f"Unexpected error during extraction with {model_id}",
+                        exc_info=True,
+                        extra={
+                            "request_id": request_id,
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    raise
 
             result = llm_circuit_breaker.call(_extract_with_retry)
 
@@ -259,6 +308,11 @@ def extract_claims_with_fallback(
                 # Record cost and usage
                 cost_tracker.record_usage(
                     request_id=request_id, prompt_text=prompt, model=model_id
+                )
+
+                logger.info(
+                    f"Successfully extracted {len(extractions)} claims with model {model_id}",
+                    extra={"request_id": request_id},
                 )
 
                 break  # Success, stop trying other models
