@@ -212,7 +212,7 @@ If you prefer to run commands manually, see the detailed instructions below.
    pip install -r requirements.txt
    
    # Download spaCy language model for claim validation
-   python -m spacy download en_core_web_sm
+   pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
    ```
 
 3. **Build the container image:**

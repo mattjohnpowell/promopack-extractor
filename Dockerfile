@@ -25,7 +25,8 @@ COPY --chown=app:app requirements.txt ./
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Download spaCy language model for claim validation
-RUN python -m spacy download en_core_web_sm
+# Using pip install instead of spacy download for Docker compatibility
+RUN pip install --no-cache-dir --user https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 # Copy application code
 COPY --chown=app:app . .

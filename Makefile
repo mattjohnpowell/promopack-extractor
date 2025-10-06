@@ -10,12 +10,12 @@ help: ## Show this help message
 
 install: ## Install production dependencies
 	pip install -r requirements.txt
-	python -m spacy download en_core_web_sm
+	pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 install-dev: ## Install development dependencies
 	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
-	python -m spacy download en_core_web_sm
+	pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 
 test: ## Run tests
 	pytest tests/ -v
