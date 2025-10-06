@@ -18,6 +18,7 @@ from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Histogram,
                                generate_latest)
 from pydantic import BaseModel, HttpUrl
 
+from claim_validation import claim_validator, ClaimType
 from config import config
 from cost_tracking import cost_tracker
 from llm_integration import (audit_data_source_language,
@@ -27,14 +28,6 @@ from pdf_processing import extract_pages_from_pdf
 from prompt_engineering import ModelType, PromptVersion
 from security import scan_and_filter_content
 from validation import validate_pdf_content, validate_url
-
-# Optional claim validation (requires spacy)
-try:
-    from claim_validation import claim_validator, ClaimType
-    CLAIM_VALIDATION_AVAILABLE = True
-except ImportError:
-    CLAIM_VALIDATION_AVAILABLE = False
-    logger.warning("claim_validation module not available (spacy not installed). Enhanced validation disabled.")
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -276,19 +269,7 @@ def validate_and_enhance_claim(
     Returns:
         Enhanced claim dict if valid, None if rejected
     """
-    # If claim validation is not available, return basic claim without validation
-    if not CLAIM_VALIDATION_AVAILABLE:
-        return {
-            "text": claim_text,
-            "confidence": confidence,
-            "suggested_type": llm_attributes.get("claim_type"),
-            "reasoning": "Validation unavailable (spacy not installed)",
-            "is_comparative": False,
-            "contains_statistics": False,
-            "warnings": None,
-        }
-    
-    # Validate using regulatory rules
+    # Validate using regulatory rules (pattern-based, no spacy required)
     validation_result = claim_validator.validate_claim(claim_text, request_id)
 
     # Reject invalid claims

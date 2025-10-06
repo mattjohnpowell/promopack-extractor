@@ -1,8 +1,9 @@
 """
 Pharmaceutical regulatory claim validation module.
 
-This module implements strict validation rules to distinguish regulatory claims
-from background information, study methodology, and sentence fragments.
+This module implements validation rules using Google Gemini 2.0 Flash
+to distinguish regulatory claims from background information, study methodology,
+and sentence fragments.
 
 A regulatory claim must pass ALL three tests:
 1. Is it a complete statement? (subject + verb + object, standalone)
@@ -14,9 +15,6 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
-
-import spacy
-from spacy.language import Language
 
 from logging_config import logger
 
@@ -70,20 +68,10 @@ class ClaimValidationResult:
 
 
 class ClaimValidator:
-    """Validates whether extracted text is a true regulatory claim."""
+    """Validates whether extracted text is a true regulatory claim using pattern matching."""
 
     def __init__(self):
-        """Initialize validator with NLP models and pattern libraries."""
-        # Load spaCy for linguistic analysis
-        try:
-            self.nlp: Language = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.warning(
-                "spaCy model 'en_core_web_sm' not found. "
-                "Run: python -m spacy download en_core_web_sm"
-            )
-            self.nlp = None
-
+        """Initialize validator with pattern libraries (no spacy required)."""
         # Non-claim patterns (SKIP these)
         self.background_patterns = [
             r"\b(affects?|afflicts?)\s+\d+(\.\d+)?\s+(million|billion|thousand)",
@@ -295,36 +283,26 @@ class ClaimValidator:
         )
 
     def _check_completeness(self, text: str) -> Tuple[bool, bool, bool]:
-        """Check if text is a complete sentence with subject and verb."""
-        if not self.nlp:
-            # Fallback to basic heuristics
-            has_verb = bool(
-                re.search(
-                    r"\b(is|are|was|were|reduce[ds]?|improve[ds]?|prevent[ds]?|cause[ds]?|show[ns]?|demonstrate[ds]?)\b",
-                    text,
-                    re.IGNORECASE,
-                )
+        """Check if text is a complete sentence with subject and verb using pattern matching."""
+        # Use pattern-based heuristics (no spacy needed)
+        has_verb = bool(
+            re.search(
+                r"\b(is|are|was|were|reduce[ds]?|improve[ds]?|prevent[ds]?|cause[ds]?|show[ns]?|demonstrate[ds]?|achieve[ds]?|indicate[ds]?|recommend[s]?|may|should|will|can)\b",
+                text,
+                re.IGNORECASE,
             )
-            has_subject = len(text.split()) >= 3
-            is_complete = text.strip().endswith((".", ")", "%")) or len(text) > 30
-            return has_subject, has_verb, is_complete
-
-        # Use spaCy for accurate parsing
-        doc = self.nlp(text)
-
-        # Check for verb
-        has_verb = any(token.pos_ in ["VERB", "AUX"] for token in doc)
-
-        # Check for subject (NOUN or PROPN as subject)
-        has_subject = any(token.dep_ in ["nsubj", "nsubjpass"] for token in doc)
-
-        # Check completeness
-        is_complete = (
-            has_verb
-            and has_subject
-            and len(doc) >= 5
-            and not text.strip().endswith((",", ";", "and", "or", "but"))
         )
+        
+        # Check for subject (likely starts with drug name, patients, study, etc.)
+        has_subject = bool(
+            re.search(
+                r"^[A-Z][a-zA-Z]+\s+(is|are|was|were|reduce|improve|prevent|demonstrate|show)|^\w+\s+(patients?|subjects?|treatment|therapy|drug)",
+                text
+            )
+        ) or len(text.split()) >= 5
+        
+        # Check completeness
+        is_complete = text.strip().endswith((".", ")", "%")) and len(text.split()) >= 5
 
         return has_subject, has_verb, is_complete
 

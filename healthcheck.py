@@ -47,7 +47,6 @@ def check_imports():
         "pydantic",
         "httpx",
         "langextract",
-        "spacy",
         "dotenv",
     ]
     
@@ -71,18 +70,20 @@ def check_imports():
     return True
 
 
-def check_spacy_model():
-    """Check if spaCy model is available."""
-    print("\n\nspaCy Model Check:")
+def check_claim_validation():
+    """Check if claim validation module is available."""
+    print("\n\nClaim Validation Check:")
     print("-" * 50)
     
     try:
-        import spacy
-        nlp = spacy.load("en_core_web_sm")
-        print("✓ spaCy model 'en_core_web_sm' loaded successfully")
+        from claim_validation import claim_validator, ClaimType
+        print("✓ Claim validation module loaded successfully")
+        print(f"  - Validation patterns initialized")
         return True
     except Exception as e:
-        print(f"✗ Failed to load spaCy model: {e}")
+        print(f"✗ Failed to load claim validation: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -154,7 +155,7 @@ def main():
     checks = [
         ("Environment Variables", check_environment),
         ("Module Imports", check_imports),
-        ("spaCy Model", check_spacy_model),
+        ("Claim Validation", check_claim_validation),
         ("Configuration", check_config),
         ("Database", check_database),
         ("App Creation", check_app_creation),
