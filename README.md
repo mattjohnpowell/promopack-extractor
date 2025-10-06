@@ -207,12 +207,20 @@ If you prefer to run commands manually, see the detailed instructions below.
    # Required: API_KEY_SECRET and LANGEXTRACT_API_KEY
    ```
 
-2. **Build the container image:**
+2. **Install Python dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   
+   # Download spaCy language model for claim validation
+   python -m spacy download en_core_web_sm
+   ```
+
+3. **Build the container image:**
    ```bash
    podman build -t promopack-extractor:latest .
    ```
 
-3. **Run the container:**
+4. **Run the container:**
    ```bash
    # For development with SQLite database
    podman run -d --name promopack-extractor \

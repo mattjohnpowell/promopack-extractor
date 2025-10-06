@@ -18,6 +18,7 @@ from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Histogram,
                                generate_latest)
 from pydantic import BaseModel, HttpUrl
 
+from claim_validation import claim_validator, ClaimType
 from config import config
 from cost_tracking import cost_tracker
 from llm_integration import (audit_data_source_language,
@@ -172,19 +173,58 @@ async def add_request_id(request: Request, call_next):
 class ExtractClaimsRequest(BaseModel):
     document_url: HttpUrl
     prompt_version: Optional[str] = (
-        None  # "v1_basic", "v2_enhanced", "v3_context_aware"
+        None  # "v1_basic", "v2_enhanced", "v3_context_aware", "v4_regulatory"
     )
     force_model: Optional[str] = None  # "gemini-1.5-flash", "gemini-1.5-pro"
 
 
+class ClaimContext(BaseModel):
+    """Context surrounding a claim for better understanding."""
+
+    preceding: Optional[str] = None  # Text before the claim
+    following: Optional[str] = None  # Text after the claim
+
+
 class Claim(BaseModel):
+    """Enhanced claim model with regulatory validation metadata."""
+
     text: str
     page: int
-    confidence_score: float
+    confidence: float  # Renamed from confidence_score for consistency
+
+    # Claim classification
+    suggested_type: Optional[str] = None  # EFFICACY, SAFETY, INDICATION, etc.
+    reasoning: Optional[str] = None  # Explanation of classification
+
+    # Context and location
+    context: Optional[ClaimContext] = None
+    section: Optional[str] = None  # Document section name
+
+    # Regulatory flags
+    is_comparative: bool = False  # Contains comparative language
+    contains_statistics: bool = False  # Has statistical evidence
+    citation_present: bool = False  # Has references
+
+    # Quality warnings
+    warnings: Optional[List[str]] = None  # Validation warnings if any
+
+
+class ExtractionMetadata(BaseModel):
+    """Metadata about the extraction process."""
+
+    total_claims_extracted: int
+    high_confidence_claims: int  # >= 0.8
+    medium_confidence_claims: int  # >= 0.5 and < 0.8
+    low_confidence_claims: int  # < 0.5
+    processing_time_ms: int
+    model_version: str
+    prompt_version: str
+    sections_analyzed: Optional[List[str]] = None
 
 
 class ExtractClaimsResponse(BaseModel):
     claims: List[Claim]
+    metadata: Optional[ExtractionMetadata] = None
     request_id: Optional[str] = None
     security_info: Optional[Dict[str, Any]] = None
 
@@ -211,6 +251,68 @@ class ErrorResponse(BaseModel):
     message: str
     request_id: str
     timestamp: str
+
+
+# Helper functions
+def validate_and_enhance_claim(
+    claim_text: str, confidence: float, llm_attributes: Dict[str, Any], request_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Validate and enhance a claim with regulatory metadata.
+
+    Args:
+        claim_text: The extracted claim text
+        confidence: LLM confidence score
+        llm_attributes: Attributes from LLM extraction
+        request_id: Request ID for logging
+
+    Returns:
+        Enhanced claim dict if valid, None if rejected
+    """
+    # Validate using regulatory rules
+    validation_result = claim_validator.validate_claim(claim_text, request_id)
+
+    # Reject invalid claims
+    if not validation_result.is_valid:
+        logger.info(
+            "Claim rejected by validator",
+            extra={
+                "request_id": request_id,
+                "claim_preview": claim_text[:100],
+                "reasoning": validation_result.reasoning,
+                "warnings": [w.value for w in validation_result.warnings],
+            },
+        )
+        return None
+
+    # Adjust confidence based on validation
+    adjusted_confidence = max(
+        0.0, min(1.0, confidence + validation_result.confidence_adjustment)
+    )
+
+    # Classify claim type
+    claim_type = claim_validator.classify_claim_type(claim_text)
+    suggested_type = claim_type.value if claim_type else llm_attributes.get("claim_type")
+
+    # Check for comparative and statistical evidence
+    is_comparative = claim_validator.is_comparative_claim(claim_text)
+    has_statistics = claim_validator.has_statistical_evidence(claim_text)
+
+    # Convert warnings to strings
+    warnings_list = (
+        [w.value for w in validation_result.warnings] if validation_result.warnings else None
+    )
+
+    # Return enhanced claim
+    return {
+        "text": claim_text,
+        "confidence": adjusted_confidence,
+        "suggested_type": suggested_type,
+        "reasoning": validation_result.reasoning,
+        "is_comparative": is_comparative,
+        "contains_statistics": has_statistics,
+        "warnings": warnings_list if warnings_list else None,
+    }
 
 
 # Security
@@ -363,12 +465,26 @@ async def process_pdf_extraction(
                     processed_text, request_id, pv, fm
                 )
 
-                # Process extractions
+                # Process extractions with validation
                 claims = []
+                rejected_count = 0
+                
                 for extraction in extractions:
                     claim_text = extraction.extraction_text
                     confidence = extraction.attributes.get("confidence", 0.9)
+                    llm_attributes = extraction.attributes or {}
 
+                    # Validate and enhance claim
+                    enhanced_claim_data = validate_and_enhance_claim(
+                        claim_text, confidence, llm_attributes, request_id
+                    )
+
+                    # Skip invalid claims
+                    if enhanced_claim_data is None:
+                        rejected_count += 1
+                        continue
+
+                    # Find page number
                     page_num = None
                     if hasattr(extraction, "spans") and extraction.spans:
                         span_start = extraction.spans[0].start
@@ -386,11 +502,20 @@ async def process_pdf_extraction(
                     if page_num:
                         claims.append(
                             Claim(
-                                text=claim_text,
                                 page=page_num,
-                                confidence_score=confidence,
+                                **enhanced_claim_data
                             )
                         )
+
+                logger.info(
+                    "Claim validation completed",
+                    extra={
+                        "request_id": request_id,
+                        "total_extracted": len(extractions),
+                        "valid_claims": len(claims),
+                        "rejected_claims": rejected_count,
+                    },
+                )
 
                 result = ExtractClaimsResponse(
                     claims=claims,
@@ -677,11 +802,24 @@ async def extract_claims(
             processed_text, request_id, prompt_version, force_model
         )
 
-        # Process extractions with source grounding
+        # Process extractions with validation
         claims = []
+        rejected_count = 0
+        
         for extraction in extractions:
             claim_text = extraction.extraction_text
             confidence = extraction.attributes.get("confidence", 0.9)
+            llm_attributes = extraction.attributes or {}
+
+            # Validate and enhance claim
+            enhanced_claim_data = validate_and_enhance_claim(
+                claim_text, confidence, llm_attributes, request_id
+            )
+
+            # Skip invalid claims
+            if enhanced_claim_data is None:
+                rejected_count += 1
+                continue
 
             # Log extraction details for debugging
             logger.debug(
@@ -729,7 +867,10 @@ async def extract_claims(
 
             if page_num:
                 claims.append(
-                    Claim(text=claim_text, page=page_num, confidence_score=confidence)
+                    Claim(
+                        page=page_num,
+                        **enhanced_claim_data
+                    )
                 )
             else:
                 logger.warning(
@@ -738,10 +879,12 @@ async def extract_claims(
                 )
 
         logger.info(
-            "Claim extraction completed successfully",
+            "Claim extraction and validation completed successfully",
             extra={
                 "request_id": request_id,
-                "claims_count": len(claims),
+                "total_extracted": len(extractions),
+                "valid_claims": len(claims),
+                "rejected_claims": rejected_count,
                 "extraction_method": extraction_method,
                 "pdf_url": str(request.document_url),
                 "detected_language": detected_language,

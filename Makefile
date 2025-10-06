@@ -10,10 +10,12 @@ help: ## Show this help message
 
 install: ## Install production dependencies
 	pip install -r requirements.txt
+	python -m spacy download en_core_web_sm
 
 install-dev: ## Install development dependencies
 	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
+	python -m spacy download en_core_web_sm
 
 test: ## Run tests
 	pytest tests/ -v

@@ -24,6 +24,9 @@ COPY --chown=app:app requirements.txt ./
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
 
+# Download spaCy language model for claim validation
+RUN python -m spacy download en_core_web_sm
+
 # Copy application code
 COPY --chown=app:app . .
 

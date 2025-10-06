@@ -23,6 +23,7 @@ class PromptVersion(Enum):
     V1_BASIC = "v1_basic"
     V2_ENHANCED = "v2_enhanced"
     V3_CONTEXT_AWARE = "v3_context_aware"
+    V4_REGULATORY = "v4_regulatory"  # Strict pharmaceutical regulatory claim extraction
 
 
 class PromptTemplate:
@@ -275,6 +276,154 @@ class PromptTemplate:
                     ),
                 ],
             },
+            PromptVersion.V4_REGULATORY: {
+                "prompt": textwrap.dedent(
+                    """\
+                    Extract ONLY pharmaceutical regulatory claims from this document.
+
+                    CRITICAL: A regulatory claim must pass ALL three tests:
+                    
+                    1. Is it a COMPLETE statement?
+                       - Has subject + verb + object
+                       - Can stand alone and be understood without surrounding context
+                       - NOT a fragment, NOT a partial sentence
+                    
+                    2. Does it make an ASSERTION about the DRUG?
+                       - States what the drug DOES, IS, or CAUSES
+                       - NOT about the disease background
+                       - NOT about study methodology
+                    
+                    3. Would a regulator ask "WHERE'S THE PROOF?"
+                       - Requires clinical evidence to substantiate
+                       - Is actionable medical information
+                       - NOT trivial facts (e.g., "is a tablet")
+
+                    EXTRACT THESE (Valid Claims):
+                    ✅ "[DRUG] reduced [outcome] by X% compared to [comparator]"
+                    ✅ "Well-tolerated in [population]"
+                    ✅ "Indicated for treatment of [condition]"
+                    ✅ "Peak plasma concentration occurs within X hours"
+                    ✅ "The most common adverse reaction was [event]"
+                    ✅ "Contraindicated in patients with [condition]"
+                    ✅ "The recommended dose is X mg [frequency]"
+
+                    DO NOT EXTRACT (Invalid - Skip These):
+                    ❌ Sentence fragments: "increase in AUCinf and a 56%"
+                    ❌ Background info: "Atrial fibrillation affects 2.7 million Americans"
+                    ❌ Study methodology: "Patients were randomized 1:1 to treatment groups"
+                    ❌ Table headers: "Adverse Event | Drug | Placebo"
+                    ❌ Section titles: "Clinical Pharmacology"
+                    ❌ Questions: "What is [DRUG]?"
+                    ❌ Citations: "(Smith et al. NEJM 2011)"
+                    ❌ Boilerplate: "See full prescribing information"
+
+                    Extract the EXACT text of the claim. Do NOT paraphrase. Include statistical data when present."""
+                ),
+                "examples": [
+                    # POSITIVE EXAMPLES - Valid Claims
+                    lx.data.ExampleData(
+                        text="XARELTO reduced the risk of stroke and systemic embolism by 21% compared to warfarin (HR 0.79, 95% CI 0.70-0.89, p<0.001).",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="XARELTO reduced the risk of stroke and systemic embolism by 21% compared to warfarin (HR 0.79, 95% CI 0.70-0.89, p<0.001)",
+                                attributes={
+                                    "confidence": 0.99,
+                                    "claim_type": "EFFICACY",
+                                    "is_comparative": True,
+                                    "has_statistics": True,
+                                },
+                            )
+                        ],
+                    ),
+                    lx.data.ExampleData(
+                        text="The most common adverse reaction was bleeding, occurring in 14.9% of XARELTO-treated patients.",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="The most common adverse reaction was bleeding, occurring in 14.9% of XARELTO-treated patients",
+                                attributes={
+                                    "confidence": 0.96,
+                                    "claim_type": "SAFETY",
+                                    "is_comparative": False,
+                                    "has_statistics": True,
+                                },
+                            )
+                        ],
+                    ),
+                    lx.data.ExampleData(
+                        text="XARELTO is indicated for the treatment of deep vein thrombosis (DVT) and pulmonary embolism (PE).",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="XARELTO is indicated for the treatment of deep vein thrombosis (DVT) and pulmonary embolism (PE)",
+                                attributes={
+                                    "confidence": 0.98,
+                                    "claim_type": "INDICATION",
+                                    "is_comparative": False,
+                                    "has_statistics": False,
+                                },
+                            )
+                        ],
+                    ),
+                    lx.data.ExampleData(
+                        text="Well-tolerated in patients 75 years and older with no dose adjustment required.",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="Well-tolerated in patients 75 years and older with no dose adjustment required",
+                                attributes={
+                                    "confidence": 0.94,
+                                    "claim_type": "SAFETY",
+                                    "is_comparative": False,
+                                    "has_statistics": False,
+                                },
+                            )
+                        ],
+                    ),
+                    # NEGATIVE EXAMPLES - Should NOT Extract
+                    lx.data.ExampleData(
+                        text="increase in AUCinf and a 56%",
+                        extractions=[],  # No extraction - incomplete fragment
+                    ),
+                    lx.data.ExampleData(
+                        text="Atrial fibrillation is a common cardiac arrhythmia affecting millions worldwide.",
+                        extractions=[],  # No extraction - background info about disease
+                    ),
+                    lx.data.ExampleData(
+                        text="In the ROCKET AF trial, 14,264 patients with atrial fibrillation were randomized to receive either XARELTO or warfarin.",
+                        extractions=[],  # No extraction - study methodology
+                    ),
+                    lx.data.ExampleData(
+                        text="Table 3: Adverse Events by Treatment Group",
+                        extractions=[],  # No extraction - table header
+                    ),
+                    lx.data.ExampleData(
+                        text="What is XARELTO?",
+                        extractions=[],  # No extraction - question
+                    ),
+                    lx.data.ExampleData(
+                        text="See full prescribing information for complete safety information.",
+                        extractions=[],  # No extraction - boilerplate
+                    ),
+                    # MIXED EXAMPLES - Extract only valid claims
+                    lx.data.ExampleData(
+                        text="In the ROCKET AF trial, patients receiving XARELTO showed a 45% reduction in major bleeding events compared to warfarin. Atrial fibrillation affects millions of people.",
+                        extractions=[
+                            lx.data.Extraction(
+                                extraction_class="claim",
+                                extraction_text="patients receiving XARELTO showed a 45% reduction in major bleeding events compared to warfarin",
+                                attributes={
+                                    "confidence": 0.97,
+                                    "claim_type": "SAFETY",
+                                    "is_comparative": True,
+                                    "has_statistics": True,
+                                },
+                            )
+                        ],  # Extract only the claim about drug performance, not the background info
+                    ),
+                ],
+            },
         }
 
     def get_template(self) -> Dict[str, Any]:
@@ -368,9 +517,10 @@ class PromptManager:
         # A/B testing configuration
         self.ab_test_enabled = True
         self.ab_test_weights = {
-            PromptVersion.V1_BASIC: 0.1,  # 10% traffic
-            PromptVersion.V2_ENHANCED: 0.2,  # 20% traffic
-            PromptVersion.V3_CONTEXT_AWARE: 0.7,  # 70% traffic (best performing)
+            PromptVersion.V1_BASIC: 0.0,  # Deprecated
+            PromptVersion.V2_ENHANCED: 0.0,  # Deprecated
+            PromptVersion.V3_CONTEXT_AWARE: 0.1,  # 10% traffic for comparison
+            PromptVersion.V4_REGULATORY: 0.9,  # 90% traffic (strict regulatory rules)
         }
 
     def select_prompt_version_for_ab_test(self) -> PromptVersion:
@@ -378,7 +528,7 @@ class PromptManager:
         import random
 
         if not self.ab_test_enabled:
-            return PromptVersion.V3_CONTEXT_AWARE
+            return PromptVersion.V4_REGULATORY
 
         rand = random.random()
         cumulative = 0.0
@@ -389,7 +539,7 @@ class PromptManager:
                 return version
 
         # Fallback to best performing
-        return PromptVersion.V3_CONTEXT_AWARE
+        return PromptVersion.V4_REGULATORY
 
     def get_prompt_config(
         self,
@@ -409,7 +559,7 @@ class PromptManager:
         elif self.ab_test_enabled:
             selected_version = self.select_prompt_version_for_ab_test()
         else:
-            selected_version = PromptVersion.V3_CONTEXT_AWARE
+            selected_version = PromptVersion.V4_REGULATORY
 
         template = self.templates[(selected_version, selected_model)]
         config = template.get_template()
