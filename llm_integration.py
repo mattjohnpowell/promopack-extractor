@@ -257,6 +257,8 @@ def extract_claims_with_fallback(
                         prompt_description=prompt,
                         examples=examples,
                         model_id=model_id,
+                        max_char_buffer=50000,  # Larger chunks for pharmaceutical documents
+                        max_workers=20,  # Parallel processing for speed
                     )
                     
                     # Log successful result for debugging
