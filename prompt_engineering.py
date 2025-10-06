@@ -454,14 +454,9 @@ class ModelSelector:
         if force_model:
             return force_model
 
-        analysis = self.analyze_complexity(text)
-
-        # Model selection logic - default to FLASH (recommended by LangExtract)
-        # PRO only for extremely complex content or when explicitly requested
-        if analysis["complexity_score"] > 5.0:  # Very high complexity threshold
-            return ModelType.GEMINI_PRO  # Only for extremely complex content
-        else:
-            return ModelType.GEMINI_FLASH  # Default to faster, recommended model
+        # Always use FLASH - it's faster and recommended by LangExtract
+        # PRO can be explicitly requested via force_model parameter if needed
+        return ModelType.GEMINI_FLASH
 
 
 class PromptManager:
